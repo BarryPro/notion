@@ -78,4 +78,5 @@ def alipay(filepath):
 if __name__ == '__main__':
     # query_page('secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi')
     # wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
+
     alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20210816_083101.csv')
