@@ -2,7 +2,7 @@
 import requests
 import query_bill
 
-version_date = '2021-08-16'
+version_date = '2021-05-13'
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
 
 
@@ -23,7 +23,7 @@ def save_database(token, database_id, body):
         "https://api.notion.com/v1/databases/" + database_id,
         data=body,
         headers={"Authorization": "Bearer " + token, "Notion-Version": version_date},
-        timeout=0.5
+        timeout=3
     )
 
 
@@ -34,7 +34,7 @@ def create_page(token, body, timeout):
         "https://api.notion.com/v1/pages",
         # 生成新页面数据
         json=body,
-        headers={"Authorization": "Bearer " + token, "Notion-Version": "2021-05-13"},
+        headers={"Authorization": "Bearer " + token, "Notion-Version": version_date},
         timeout=timeout
     )
 
@@ -87,15 +87,16 @@ def query_alipay(token, database_id):
 
 if __name__ == '__main__':
     # query_wechat(token_auth, "d250ca9f916c4c0e82b66d451f434701")
-    # query_alipay(token_auth, "526f7c6fccc54ff5b468557fce038dce")
+    # print(query_alipay(token_auth, "651c89d606e64394ace3a6791594c183"))
     # print(query_database(token_auth, "d250ca9f916c4c0e82b66d451f434701").json())
-    # database = query_database(token_auth, "651c89d606e64394ace3a6791594c183").json()
+    database = query_database(token_auth, "526f7c6fccc54ff5b468557fce038dce").json()
+    print(database)
     # for row in database['results']:
     #     print(row['properties']['总账单'])
-    # page = query_page(token_auth, "9f41a7db-d256-4376-bca2-555690ea633b").json()
+    # page = query_page(token_auth, "651c89d606e64394ace3a6791594c183").json()
     # print(page)
-    response = search(token_auth, 5, "2021/07/31").json()
-    print(query_bill.find_total_bill(response))
+    # response = search(token_auth, 5, "2021/08/28").json()
+    # print(query_bill.find_total_bill(response))
     # time = "2021-07-31 15:07:01"
     # date = time.split(" ")[0]
     # print(date.replace("-", "/"))

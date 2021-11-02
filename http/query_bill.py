@@ -1,13 +1,14 @@
 # -*- coding: UTF-8 -*-
 import csv
+import urllib.parse
 
-import arrow
 import regex as regex
-import notion
+import my_notion
 
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
 wechat_database_id = "651c89d606e64394ace3a6791594c183"
 total_bill_database_id = "d250ca9f916c4c0e82b66d451f434701"
+alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
 
 
 def wechat(filepath):
@@ -29,7 +30,32 @@ def wechat(filepath):
             except Exception:
                 print("写微信数据异常")
                 print(row)
-        print("执行完成")
+        print("微信账单-执行完成")
+
+
+def alipay(filepath):
+    with open(filepath, "r", encoding="gbk", newline="") as f:
+        lines = f.readlines()
+        striped_lines = []
+        start = False
+        for line in lines:
+            if not start:
+                if line.startswith("------------------------"):
+                    start = True
+                continue
+            if line.startswith("----------------------------"):
+                break
+            l = regex.sub(r"\s+,", ",", line)
+            striped_lines.append(l)
+
+        csv_reader = csv.DictReader(striped_lines)
+        for row in csv_reader:
+            try:
+                save_alipay_row(row, 3, 1)
+            except Exception:
+                print("写支付宝数据异常")
+                print(row)
+        print("支付宝账单-执行完成")
 
 
 # 支持超时重试保存微信账单
@@ -38,7 +64,7 @@ def save_wechat_row(row, timeout, retry_count):
         if timeout > 10:
             print("超过最大超时时间")
             return
-        response = save_wechat(notion.token_auth, wechat_database_id, row, timeout)
+        response = save_wechat(my_notion.token_auth, wechat_database_id, row, timeout)
         code = response.status_code
         if code != 200:
             print(code)
@@ -50,6 +76,38 @@ def save_wechat_row(row, timeout, retry_count):
         save_wechat_row(row, timeout+1, retry_count + 1)
 
 
+# 支持超时重试保存微信账单
+def save_alipay_row(row, timeout, retry_count):
+    try:
+        if timeout > 10:
+            print("超过最大超时时间")
+            return
+        response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout)
+        code = response.status_code
+        if code != 200:
+            print(code)
+            print(row)
+        else:
+            print(str(row["商品说明"])+":保存成功")
+    except Exception:
+        print(str(row['商品说明'])+":超时，第"+str(retry_count)+"次重试开始")
+        save_alipay_row(row, timeout+1, retry_count + 1)
+
+
+def save_alipay(token, target_database_id, data, timeout):
+    # 重写微信账单名称
+    name = data["商品说明"]
+    if data["商品说明"] == '/':
+        name = data['交易分类']
+
+    # 生成写入数据
+    body = gen_body_alipay(target_database_id, data, name)
+    print(body)
+
+    # 创建数据page
+    return my_notion.create_page(token, body, timeout)
+
+
 # 保存微信账单
 def save_wechat(token, target_database_id, data, timeout):
     # 重写微信账单名称
@@ -57,8 +115,6 @@ def save_wechat(token, target_database_id, data, timeout):
     if data["商品"] == '/':
         name = data['交易类型']
 
-    # 获取搜索账单名称
-    search_text = ""
     try:
         search_text = gen_search_text(data)
     except Exception:
@@ -69,7 +125,7 @@ def save_wechat(token, target_database_id, data, timeout):
     relation_database_id = ""
     create_total_bill_response = ""
     try:
-        search_response = notion.search(token, 3, search_text).json()
+        search_response = my_notion.search(token, 3, search_text).json()
         find_result = find_total_bill(search_response)
         # 检查是否存在本日账单
         if find_result is None:
@@ -83,7 +139,7 @@ def save_wechat(token, target_database_id, data, timeout):
         print(str(search_text)+"关联异常")
         create_total_bill_response = create_total_bill(token, total_bill_database_id, 5, search_text)
         if create_total_bill_response.status_code == 200:
-            search_response = notion.search(token, 3, search_text).json()
+            search_response = my_notion.search(token, 3, search_text).json()
             find_result = find_total_bill(search_response)
             relation_database_id = find_result['id']
             print("Exception搜索成功：" + str(relation_database_id))
@@ -91,11 +147,11 @@ def save_wechat(token, target_database_id, data, timeout):
             raise Exception("需要重试异常")
 
     # 生成写入数据
-    body = gen_body(target_database_id, data, relation_database_id, name)
+    body = gen_body_wechat(target_database_id, data, relation_database_id, name)
     print(body)
 
     # 创建数据page
-    return notion.create_page(token, body, timeout)
+    return my_notion.create_page(token, body, timeout)
 
 
 def find_total_bill(search_response):
@@ -117,7 +173,7 @@ def gen_search_text(data):
 
 
 # 生成数据响应体
-def gen_body(target_database_id, data, relation_id, name):
+def gen_body_wechat(target_database_id, data, name):
     return {
         "parent": {"type": "database_id", "database_id": target_database_id},
         "properties": {
@@ -140,12 +196,6 @@ def gen_body(target_database_id, data, relation_id, name):
             "交易对方": {
                 "rich_text": [
                     {"type": "text", "text": {"content": data["交易对方"]}}
-                ]
-            },
-            "总账单": {
-                "type": "relation",
-                "relation": [
-                    {"id": relation_id}
                 ]
             },
             "当前状态": {
@@ -196,6 +246,73 @@ def gen_body(target_database_id, data, relation_id, name):
     }
 
 
+def gen_body_alipay(target_database_id, data, name):
+    return {
+        "parent": {"type": "database_id", "database_id": target_database_id},
+        "properties": {
+            "交易时间": {
+                "type": "date",
+                "date": {
+                    "start": data["交易时间"]
+                }
+            },
+            "交易分类": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": data["交易分类"]}}
+                ]
+            },
+            "商品说明": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": data["商品说明"]}}
+                ]
+            },
+            "交易对方": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": data["交易对方"]}}
+                ]
+            },
+            "交易状态": {
+                "type": "select",
+                "select": {
+                    "name": data["交易状态"],
+                }
+            },
+            "收/支": {
+                "type": "select",
+                "select": {
+                    "name": data["收/支"],
+                }
+            },
+            "金额": {
+                "type": "rich_text",
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {
+                            "content": data["金额"]
+                        }
+                    }
+                ]
+            },
+            "Name": {
+                "title": [
+                    {"type": "text", "text": {"content": name}}
+                ]
+            }
+        },
+        # 设置文本内容
+        "children": [
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "text": [{"type": "text", "text": {"content": ""}}]
+                }
+            }
+        ]
+    }
+
+
 # 创建总账单页
 def create_total_bill(token, target_database_id, timeout, name):
     body = {
@@ -208,7 +325,7 @@ def create_total_bill(token, target_database_id, timeout, name):
             }
         }
     }
-    response = notion.create_page(token, body, timeout)
+    response = my_notion.create_page(token, body, timeout)
     print(name+"创建成功")
     return response
 
@@ -239,12 +356,12 @@ def mock_wechat(target_database_id):
                     {"type": "text", "text": {"content": "杨占邦"}}
                 ]
             },
-            "总账单": {
-                "type": "relation",
-                "relation": [
-                    {"id": "ecdd3db8-3853-4168-9009-a62257eb5ba1"}
-                ]
-            },
+            # "总账单": {
+            #     "type": "relation",
+            #     "relation": [
+            #         {"id": "ecdd3db8-3853-4168-9009-a62257eb5ba1"}
+            #     ]
+            # },
             "当前状态": {
                 "type": "select",
                 "select": {
@@ -291,46 +408,75 @@ def mock_wechat(target_database_id):
             }
         ]
     }
-    print(notion.create_page(token_auth, body, 3))
+    print(my_notion.create_page(token_auth, body, 3))
 
 
-def alipay(filepath):
-    with open(filepath, "r", encoding="gbk", newline="") as f:
-        lines = f.readlines()
-        striped_lines = []
-        start = False
-        for line in lines:
-            if not start:
-                if line.startswith("------------------------"):
-                    start = True
-                continue
-            if line.startswith("----------------------------"):
-                break
-            l = regex.sub(r"\s+,", ",", line)
-            striped_lines.append(l)
-
-        csv_reader = csv.DictReader(striped_lines)
-        for row in csv_reader:
-            t = arrow.get(row["交易时间"]).replace(tzinfo="+08").datetime
-            c = row["商品说明"] + "，" + row["交易对方"]
-            a = row["金额"]
-            d = row["收/支"]
-            print(t, c, a, d)
-            if a == "0":
-                print("[未被计入]")
-                continue
-            elif d == "已收入" or d == "解冻":
-                a = "-" + a
-            elif d == "已支出" or d == "冻结":
-                pass
-            else:
-                print("[未被计入]")
-                continue
+# 模拟支付宝账单
+def mock_alipay(target_database_id):
+    body = {
+        "parent": {"type": "database_id", "database_id": target_database_id},
+        "properties": {
+            "交易时间": {
+                "type": "date",
+                "date": {
+                    "start": "2021-07-31 15:07:01"
+                }
+            },
+            "交易分类": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": "日用百货"}}
+                ]
+            },
+            "商品说明": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": "商品说明"}}
+                ]
+            },
+            "交易对方": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": "天弘"}}
+                ]
+            },
+            "交易状态": {
+                "type": "select",
+                "select": {
+                    "name": "支付成功",
+                }
+            },
+            "收/支": {
+                "type": "select",
+                "select": {
+                    "name": "其他",
+                }
+            },
+            "金额": {
+                "type": "number",
+                "number": 50
+            },
+            "Name": {
+                "title": [
+                    {"type": "text", "text": {"content": "测试"}}
+                ]
+            }
+        },
+        # 设置文本内容
+        "children": [
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "text": [{"type": "text", "text": {"content": ""}}]
+                }
+            }
+        ]
+    }
+    response = my_notion.create_page(token_auth, body, 3)
+    print(response.content.decode())
 
 
 if __name__ == '__main__':
-    # query_page('secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi')
-    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
-    # mock_wechat("651c89d606e64394ace3a6791594c183")
+    # wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
+    # mock_wechat(wechat_database_id)
+    mock_alipay(alipay_database_id)
     # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20210816_083101.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
