@@ -1,14 +1,19 @@
 # -*- coding: UTF-8 -*-
 import csv
-import urllib.parse
+import traceback
 
 import regex as regex
 import my_notion
+import thread_util
 
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
 wechat_database_id = "651c89d606e64394ace3a6791594c183"
 total_bill_database_id = "d250ca9f916c4c0e82b66d451f434701"
 alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
+
+
+# 线程池数量-账单行数
+THREAD_POOL_SUM_ROW = 10
 
 
 def wechat(filepath):
@@ -49,13 +54,21 @@ def alipay(filepath):
             striped_lines.append(l)
 
         csv_reader = csv.DictReader(striped_lines)
-        for row in csv_reader:
-            try:
-                save_alipay_row(row, 3, 1)
-            except Exception:
-                print("写支付宝数据异常")
-                print(row)
+        thread_util.thread_pool_processor(csv_reader, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
+        # for row in csv_reader:
+        #     try:
+        #         save_alipay_row(row, 3, 1)
+        #     except Exception as e:
+        #         print("写支付宝数据异常"+traceback.format_exc())
         print("支付宝账单-执行完成")
+
+
+def save_wechat_row_thread(row):
+    save_wechat_row(row, 8, 1)
+
+
+def save_alipay_row_thread(row):
+    save_alipay_row(row, 8, 1)
 
 
 # 支持超时重试保存微信账单
@@ -85,12 +98,11 @@ def save_alipay_row(row, timeout, retry_count):
         response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout)
         code = response.status_code
         if code != 200:
-            print(code)
-            print(row)
+            print("code: "+str(code)+"=====>"+response.content.decode())
         else:
             print(str(row["商品说明"])+":保存成功")
-    except Exception:
-        print(str(row['商品说明'])+":超时，第"+str(retry_count)+"次重试开始")
+    except Exception as e:
+        print(str(row['商品说明'])+"=====>超时，第"+str(retry_count)+"次重试开始"+"exception:\n"+traceback.format_exc())
         save_alipay_row(row, timeout+1, retry_count + 1)
 
 
@@ -102,7 +114,6 @@ def save_alipay(token, target_database_id, data, timeout):
 
     # 生成写入数据
     body = gen_body_alipay(target_database_id, data, name)
-    print(body)
 
     # 创建数据page
     return my_notion.create_page(token, body, timeout)
@@ -284,14 +295,8 @@ def gen_body_alipay(target_database_id, data, name):
                 }
             },
             "金额": {
-                "type": "rich_text",
                 "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {
-                            "content": data["金额"]
-                        }
-                    }
+                    {"type": "text", "text": {"content": data["金额"]}}
                 ]
             },
             "Name": {
@@ -450,8 +455,9 @@ def mock_alipay(target_database_id):
                 }
             },
             "金额": {
-                "type": "number",
-                "number": 50
+                "rich_text": [
+                    {"type": "text", "text": {"content": "50"}}
+                ]
             },
             "Name": {
                 "title": [
@@ -470,13 +476,13 @@ def mock_alipay(target_database_id):
             }
         ]
     }
-    response = my_notion.create_page(token_auth, body, 3)
-    print(response.content.decode())
+
+    print(my_notion.create_page(token_auth, body, 3))
 
 
 if __name__ == '__main__':
     # wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
     # mock_wechat(wechat_database_id)
-    mock_alipay(alipay_database_id)
-    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20210816_083101.csv')
+    # mock_alipay(alipay_database_id)
+    alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20210816_083101.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
