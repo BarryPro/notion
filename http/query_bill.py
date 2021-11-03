@@ -13,7 +13,9 @@ alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
 
 
 # 线程池数量-账单行数
-THREAD_POOL_SUM_ROW = 10
+THREAD_POOL_SUM_ROW = 200
+# 超时时间10秒
+TIME_OUT = 10
 
 
 def wechat(filepath):
@@ -29,12 +31,7 @@ def wechat(filepath):
             striped_lines.append(line.strip())
 
         csv_reader = csv.DictReader(striped_lines)
-        for row in csv_reader:
-            try:
-                save_wechat_row(row, 3, 1)
-            except Exception:
-                print("写微信数据异常")
-                print(row)
+        thread_util.thread_pool_processor(csv_reader, save_wechat_row_thread, THREAD_POOL_SUM_ROW)
         print("微信账单-执行完成")
 
 
@@ -55,44 +52,38 @@ def alipay(filepath):
 
         csv_reader = csv.DictReader(striped_lines)
         thread_util.thread_pool_processor(csv_reader, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
-        # for row in csv_reader:
-        #     try:
-        #         save_alipay_row(row, 3, 1)
-        #     except Exception as e:
-        #         print("写支付宝数据异常"+traceback.format_exc())
         print("支付宝账单-执行完成")
 
 
 def save_wechat_row_thread(row):
-    save_wechat_row(row, 8, 1)
+    save_wechat_row(row, 10, 1)
 
 
 def save_alipay_row_thread(row):
-    save_alipay_row(row, 8, 1)
+    save_alipay_row(row, 10, 1)
 
 
 # 支持超时重试保存微信账单
 def save_wechat_row(row, timeout, retry_count):
     try:
-        if timeout > 10:
+        if timeout > 20:
             print("超过最大超时时间")
             return
         response = save_wechat(my_notion.token_auth, wechat_database_id, row, timeout)
         code = response.status_code
         if code != 200:
-            print(code)
-            print(row)
+            print("code: "+str(code)+"=====>"+response.content.decode())
         else:
             print(str(row["商品"])+":保存成功")
     except Exception:
-        print(str(row['商品'])+":超时，第"+str(retry_count)+"次重试开始")
+        print(str(row['商品'])+"=====>超时，第"+str(retry_count)+"次重试开始"+"exception:\n"+traceback.format_exc())
         save_wechat_row(row, timeout+1, retry_count + 1)
 
 
 # 支持超时重试保存微信账单
 def save_alipay_row(row, timeout, retry_count):
     try:
-        if timeout > 10:
+        if timeout > 20:
             print("超过最大超时时间")
             return
         response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout)
@@ -126,40 +117,8 @@ def save_wechat(token, target_database_id, data, timeout):
     if data["商品"] == '/':
         name = data['交易类型']
 
-    try:
-        search_text = gen_search_text(data)
-    except Exception:
-        print("生成搜索文本失败")
-        search_text = gen_search_text(data)
-
-    # 获取关联数据库ID
-    relation_database_id = ""
-    create_total_bill_response = ""
-    try:
-        search_response = my_notion.search(token, 3, search_text).json()
-        find_result = find_total_bill(search_response)
-        # 检查是否存在本日账单
-        if find_result is None:
-            print("没有当日总账单，新创建账单")
-            create_total_bill_response = create_total_bill(token, total_bill_database_id, 5, search_text)
-        # 创建成功搜索新创建的总账单
-        else:
-            relation_database_id = find_result['id']
-            print("搜索成功："+str(relation_database_id))
-    except Exception:
-        print(str(search_text)+"关联异常")
-        create_total_bill_response = create_total_bill(token, total_bill_database_id, 5, search_text)
-        if create_total_bill_response.status_code == 200:
-            search_response = my_notion.search(token, 3, search_text).json()
-            find_result = find_total_bill(search_response)
-            relation_database_id = find_result['id']
-            print("Exception搜索成功：" + str(relation_database_id))
-        else:
-            raise Exception("需要重试异常")
-
     # 生成写入数据
-    body = gen_body_wechat(target_database_id, data, relation_database_id, name)
-    print(body)
+    body = gen_body_wechat(target_database_id, data, name)
 
     # 创建数据page
     return my_notion.create_page(token, body, timeout)
@@ -481,8 +440,8 @@ def mock_alipay(target_database_id):
 
 
 if __name__ == '__main__':
-    # wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
+    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
-    alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20210816_083101.csv')
+    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20210816_083101.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
