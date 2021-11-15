@@ -67,7 +67,7 @@ def save_alipay_row_thread(row):
 def save_wechat_row(row, timeout, retry_count):
     try:
         if timeout > 20:
-            print("超过最大超时时间")
+            print("超过最大超时时间"+row["商品"])
             return
         response = save_wechat(my_notion.token_auth, wechat_database_id, row, timeout)
         code = response.status_code
@@ -84,7 +84,7 @@ def save_wechat_row(row, timeout, retry_count):
 def save_alipay_row(row, timeout, retry_count):
     try:
         if timeout > 20:
-            print("超过最大超时时间")
+            print("超过最大超时时间"+row["商品说明"])
             return
         response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout)
         code = response.status_code
@@ -440,8 +440,8 @@ def mock_alipay(target_database_id):
 
 
 if __name__ == '__main__':
-    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
+    # wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210801-20211031).csv')
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
-    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20210816_083101.csv')
+    alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_219701-1031.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
