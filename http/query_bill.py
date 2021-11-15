@@ -16,6 +16,8 @@ alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
 THREAD_POOL_SUM_ROW = 200
 # 超时时间10秒
 TIME_OUT = 10
+# 最大重试次数
+MAX_RETRY_COUNT = 100
 
 
 def wechat(filepath):
@@ -66,7 +68,7 @@ def save_alipay_row_thread(row):
 # 支持超时重试保存微信账单
 def save_wechat_row(row, timeout, retry_count):
     try:
-        if timeout > 20:
+        if timeout > MAX_RETRY_COUNT:
             print("超过最大超时时间"+row["商品"])
             return
         response = save_wechat(my_notion.token_auth, wechat_database_id, row, timeout)
@@ -83,7 +85,7 @@ def save_wechat_row(row, timeout, retry_count):
 # 支持超时重试保存微信账单
 def save_alipay_row(row, timeout, retry_count):
     try:
-        if timeout > 20:
+        if timeout > MAX_RETRY_COUNT:
             print("超过最大超时时间"+row["商品说明"])
             return
         response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout)
