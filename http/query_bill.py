@@ -18,6 +18,8 @@ THREAD_POOL_SUM_ROW = 200
 TIME_OUT = 10
 # 最大重试次数
 MAX_RETRY_COUNT = 100
+# 账单归属人
+BILL_PERSON = ""
 
 
 def wechat(filepath):
@@ -25,6 +27,8 @@ def wechat(filepath):
         lines = f.readlines()
         striped_lines = []
         start = False
+        global BILL_PERSON
+        BILL_PERSON = lines[1].replace("微信昵称：[", "").replace("],,,,,,,,", "")
         for line in lines:
             if not start:
                 if line.startswith("----------------------"):
@@ -48,12 +52,14 @@ def alipay(filepath):
                     start = True
                 continue
             if line.startswith("----------------------------"):
+                global BILL_PERSON
+                BILL_PERSON = lines[lines.index(line)+2].replace("姓名：", "")
                 break
             l = regex.sub(r"\s+,", ",", line)
             striped_lines.append(l)
 
-        csv_reader = csv.DictReader(striped_lines)
-        thread_util.thread_pool_processor(csv_reader, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
+        # csv_reader = csv.DictReader(striped_lines)
+        # thread_util.thread_pool_processor(csv_reader, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
         print("支付宝账单-执行完成")
 
 
@@ -117,7 +123,9 @@ def save_wechat(token, target_database_id, data, timeout):
     # 重写微信账单名称
     name = data["商品"]
     if data["商品"] == '/':
-        name = data['交易类型']
+        name = data['交易对方']+"-"+data['交易类型']
+    elif data['交易类型'] == '转账':
+        name = data['交易对方'] + "-" + data['交易类型']
 
     # 生成写入数据
     body = gen_body_wechat(target_database_id, data, name)
@@ -168,6 +176,11 @@ def gen_body_wechat(target_database_id, data, name):
             "交易对方": {
                 "rich_text": [
                     {"type": "text", "text": {"content": data["交易对方"]}}
+                ]
+            },
+            "账单归属人": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": BILL_PERSON}}
                 ]
             },
             "当前状态": {
@@ -241,6 +254,11 @@ def gen_body_alipay(target_database_id, data, name):
             "交易对方": {
                 "rich_text": [
                     {"type": "text", "text": {"content": data["交易对方"]}}
+                ]
+            },
+            "账单归属人": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": BILL_PERSON}}
                 ]
             },
             "交易状态": {
@@ -442,7 +460,7 @@ def mock_alipay(target_database_id):
 
 
 if __name__ == '__main__':
-    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210701-20210731).csv')
+    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210801-20211031).csv')
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
     # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_219701-1031.csv')
