@@ -58,8 +58,8 @@ def alipay(filepath):
             l = regex.sub(r"\s+,", ",", line)
             striped_lines.append(l)
 
-        # csv_reader = csv.DictReader(striped_lines)
-        # thread_util.thread_pool_processor(csv_reader, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
+        csv_reader = csv.DictReader(striped_lines)
+        thread_util.thread_pool_processor(csv_reader, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
         print("支付宝账单-执行完成")
 
 
@@ -460,8 +460,8 @@ def mock_alipay(target_database_id):
 
 
 if __name__ == '__main__':
-    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210801-20211031).csv')
+    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210101-20210331).csv')
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
-    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_219701-1031.csv')
+    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20211201_234522.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
