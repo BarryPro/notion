@@ -244,6 +244,10 @@ def gen_body_wechat(target_database_id, data, name):
 
 def gen_body_alipay(target_database_id, data, name):
     pay_method = data["收/付款方式"] if data["收/付款方式"] != '' else "默认"
+    if pay_method.find('花呗') >= 0:
+        pay_method = "花呗"
+    if pay_method.find("北京银行信用卡(6657)") >= 0:
+        pay_method = "北京银行信用卡(6657)"
     return {
         "parent": {"type": "database_id", "database_id": target_database_id},
         "properties": {
@@ -486,8 +490,8 @@ def mock_alipay(target_database_id):
 
 
 if __name__ == '__main__':
-    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20211201-20220129).csv')
+    # wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20211201-20220129).csv')
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
-    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20211201~20220129.csv')
+    alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20211201~20220129.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
