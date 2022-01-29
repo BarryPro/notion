@@ -7,7 +7,7 @@ import my_notion
 import thread_util
 
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
-wechat_database_id = "651c89d606e64394ace3a6791594c183"
+# wechat_database_id = "651c89d606e64394ace3a6791594c183"
 total_bill_database_id = "d250ca9f916c4c0e82b66d451f434701"
 alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
 
@@ -77,14 +77,14 @@ def save_wechat_row(row, timeout, retry_count):
         if timeout > MAX_RETRY_COUNT:
             print("超过最大超时时间"+row["商品"])
             return
-        response = save_wechat(my_notion.token_auth, wechat_database_id, row, timeout)
+        response = save_wechat(my_notion.token_auth, alipay_database_id, row, timeout)
         code = response.status_code
         if code != 200:
-            print("code: "+str(code)+"=====>"+response.content.decode())
+            print(row["商品"]+"code: "+str(code)+"=====>"+response.content.decode())
         else:
             print(str(row["商品"])+":保存成功")
     except Exception:
-        print(str(row['商品'])+"=====>超时，第"+str(retry_count)+"次重试开始"+"exception:\n"+traceback.format_exc())
+        print(str(row['商品'])+"=====>超时，第"+str(retry_count)+"次重试开始")
         save_wechat_row(row, timeout+1, retry_count + 1)
 
 
@@ -97,11 +97,11 @@ def save_alipay_row(row, timeout, retry_count):
         response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout)
         code = response.status_code
         if code != 200:
-            print("code: "+str(code)+"=====>"+response.content.decode())
+            print(row["商品说明"]+"code: "+str(code)+"=====>"+response.content.decode()+"\n")
         else:
             print(str(row["商品说明"])+":保存成功")
     except Exception as e:
-        print(str(row['商品说明'])+"=====>超时，第"+str(retry_count)+"次重试开始"+"exception:\n"+traceback.format_exc())
+        print(str(row['商品说明'])+"=====>超时，第"+str(retry_count)+"次重试开始"+"\n")
         save_alipay_row(row, timeout+1, retry_count + 1)
 
 
@@ -154,6 +154,9 @@ def gen_search_text(data):
 
 # 生成数据响应体
 def gen_body_wechat(target_database_id, data, name):
+    pay_method = data["支付方式"] if data["支付方式"] != '/' else "默认"
+    pay_method = pay_method.replace("浦发银行", "浦发银行储蓄卡").replace("北京银行", "北京银行储蓄卡")
+    money = str(data["金额(元)"]).replace("¥", "")
     return {
         "parent": {"type": "database_id", "database_id": target_database_id},
         "properties": {
@@ -163,12 +166,13 @@ def gen_body_wechat(target_database_id, data, name):
                     "start": data["交易时间"]
                 }
             },
-            "交易类型": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": data["交易类型"]}}
-                ]
+            "交易分类": {
+                "type": "select",
+                "select": {
+                    "name": data["交易类型"],
+                }
             },
-            "商品": {
+            "交易说明": {
                 "rich_text": [
                     {"type": "text", "text": {"content": data["商品"]}}
                 ]
@@ -179,11 +183,12 @@ def gen_body_wechat(target_database_id, data, name):
                 ]
             },
             "账单归属人": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": BILL_PERSON}}
-                ]
+                "type": "select",
+                "select": {
+                    "name": BILL_PERSON,
+                }
             },
-            "当前状态": {
+            "交易状态": {
                 "type": "select",
                 "select": {
                     "name": data["当前状态"],
@@ -195,21 +200,27 @@ def gen_body_wechat(target_database_id, data, name):
                     "name": data["收/支"],
                 }
             },
-            "金额(元)": {
+            "收/付款方式": {
+                "type": "select",
+                "select": {
+                    "name": pay_method,
+                }
+            },
+            "金额": {
                 "type": "rich_text",
                 "rich_text": [
                     {
                         "type": "text",
                         "text": {
-                            "content": data["金额(元)"]
+                            "content": money
                         }
                     }
                 ]
             },
-            "支付方式": {
+            "账单来源": {
                 "type": "select",
                 "select": {
-                    "name": data["支付方式"],
+                    "name": "微信",
                 }
             },
             "Name": {
@@ -232,6 +243,7 @@ def gen_body_wechat(target_database_id, data, name):
 
 
 def gen_body_alipay(target_database_id, data, name):
+    pay_method = data["收/付款方式"] if data["收/付款方式"] != '' else "默认"
     return {
         "parent": {"type": "database_id", "database_id": target_database_id},
         "properties": {
@@ -242,11 +254,12 @@ def gen_body_alipay(target_database_id, data, name):
                 }
             },
             "交易分类": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": data["交易分类"]}}
-                ]
+                "type": "select",
+                "select": {
+                    "name": data["交易分类"],
+                }
             },
-            "商品说明": {
+            "交易说明": {
                 "rich_text": [
                     {"type": "text", "text": {"content": data["商品说明"]}}
                 ]
@@ -257,9 +270,10 @@ def gen_body_alipay(target_database_id, data, name):
                 ]
             },
             "账单归属人": {
-                "rich_text": [
-                    {"type": "text", "text": {"content": BILL_PERSON}}
-                ]
+                "type": "select",
+                "select": {
+                    "name": BILL_PERSON,
+                }
             },
             "交易状态": {
                 "type": "select",
@@ -273,10 +287,22 @@ def gen_body_alipay(target_database_id, data, name):
                     "name": data["收/支"],
                 }
             },
+            "收/付款方式": {
+                "type": "select",
+                "select": {
+                    "name": pay_method,
+                }
+            },
             "金额": {
                 "rich_text": [
                     {"type": "text", "text": {"content": data["金额"]}}
                 ]
+            },
+            "账单来源": {
+                "type": "select",
+                "select": {
+                    "name": "支付宝",
+                }
             },
             "Name": {
                 "title": [
@@ -460,8 +486,8 @@ def mock_alipay(target_database_id):
 
 
 if __name__ == '__main__':
-    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20210101-20210331).csv')
+    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20211201-20220129).csv')
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
-    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20211201_234522.csv')
+    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20211201~20220129.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
