@@ -9,6 +9,7 @@ import thread_util
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
 # wechat_database_id = "651c89d606e64394ace3a6791594c183"
 total_bill_database_id = "d250ca9f916c4c0e82b66d451f434701"
+# 账单明细表
 alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
 
 
@@ -490,8 +491,8 @@ def mock_alipay(target_database_id):
 
 
 if __name__ == '__main__':
-    # wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20211201-20220129).csv')
+    wechat('C:\\Users\\Administrator\\Desktop\\微信支付账单(20201001-20201231).csv')
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
-    alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_20211201~20220129.csv')
+    # alipay('C:\\Users\\Administrator\\Desktop\\alipay_record_2017.csv')
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
