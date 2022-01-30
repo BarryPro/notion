@@ -45,6 +45,6 @@ def gen_update_content(database_id, day_id, month_id):
 
 
 if __name__ == '__main__':
-    # update_bill('90-C-ce620594aac14b6badc867aa889cf8b2',
-    #             gen_update_content(alipay_database_id, "6ba3989b-6279-4480-b8a5-dc8d440d4ec5", "2022-1-6378dd6aa00e4b6fa9de61c746414498"))
-    print(my_notion.search(token_auth, 10, "2022年2月", month_database_id, "月份").json())
+    update_bill('ce620594aac14b6badc867aa889cf8b2',
+                gen_update_content(alipay_database_id, "aa51762e-bb28-4d86-b3c2-b4a5837ab780", "6378dd6a-a00e-4b6f-a9de-61c746414498"))
+    # print(my_notion.search(token_auth, 10, "2022年1月", month_database_id, "月份").json())

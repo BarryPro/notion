@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 import requests
+import query_notion
 
 version_date = '2021-05-13'
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
@@ -58,28 +59,12 @@ def query_page(token, page_id):
 
 
 # 搜索功能
-def search(token, timeout, text, database_id, property_name):
+def search(token, timeout, query, database_id):
     return requests.request(
         "POST",
         "https://api.notion.com/v1/databases/"+database_id+"/query",
         # 根据text查询数据
-        json={
-            "query": text,
-            "sort": {
-                "direction": "descending",
-                "timestamp": "last_edited_time"
-            },
-            "filter": {
-                "and": [
-                    {
-                        "property": property_name,
-                        "text": {
-                            "contains": text
-                        }
-                    }
-                ]
-            }
-        },
+        json=query,
         headers={"Authorization": "Bearer " + token, "Notion-Version": version_date},
         timeout=timeout
     )
@@ -108,7 +93,9 @@ if __name__ == '__main__':
     # print(database)
     # for row in database['results']:
     #     print(row['properties']['总账单'])
-    page = search(token_auth, 10, "2022/01/30", "53029b8eef9e47e0a3ee916f71018c9a", "标题").json()
+    page = search(token_auth, 10,
+                  query_notion.gen_search_condition_title("2022/01/26", "标题"),
+                  "53029b8eef9e47e0a3ee916f71018c9a").json()
     print(page)
     # response = search(token_auth, 5, "2021/08/28").json()
     # print(query_bill.find_total_bill(response))
