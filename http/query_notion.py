@@ -93,16 +93,18 @@ def update_thread(page_result):
     month_id = ""
     if month_page is not None:
         if month_page.json()['results'] is not None:
-            month_id = month_page.json()['results'][0]['id']
-            print("month_id: "+month_id)
+            if len(month_page.json()['results']) > 0:
+                month_id = month_page.json()['results'][0]['id']
+                print("month_id: "+month_id)
 
     # 搜索日报
     day = properties['日期']['formula']['string']
     day_page = search_processor(day, "标题", "53029b8eef9e47e0a3ee916f71018c9a", 10, 1)
     if day_page is not None:
         if day_page.json()['results'] is not None:
-            day_id = day_page.json()['results'][0]['id']
-            print("day_id: "+day_id)
+            if len(day_page.json()['results']) > 0:
+                day_id = day_page.json()['results'][0]['id']
+                print("day_id: "+day_id)
 
     # 参数是否合法检查
     if month_id == "" or day_id == "":
@@ -116,7 +118,7 @@ def update_thread(page_result):
 
 
 if __name__ == '__main__':
-    page = my_notion.search(token_auth, 10, gen_search_condition_time("2021-12-01", "2021-12-31", "交易时间"),
+    page = my_notion.search(token_auth, 10, gen_search_condition_time("2021-04-24", "2021-04-24", "交易时间"),
                             "526f7c6fccc54ff5b468557fce038dce")
     page_json = page.json()
     index = 1
