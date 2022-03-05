@@ -1,4 +1,7 @@
 # -*- coding: UTF-8 -*-
+
+import future as future
+
 import my_notion
 import update_bill
 import traceback
@@ -8,8 +11,6 @@ version_date = '2021-05-13'
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
 # 账单明细表
 alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
-# 最大重试次数
-MAX_RETRY_COUNT = 15
 # 线程池数量-账单行数
 THREAD_POOL_SUM_ROW = 200
 
@@ -68,19 +69,29 @@ def gen_search_condition_time(start, end, property_name):
 # 支持超时重试保存微信账单
 def search_processor(query, property_name, database_id, timeout, retry_count):
     try:
-        if timeout > MAX_RETRY_COUNT:
+        if retry_count <= 0:
             print("超过最大超时时间"+query)
             return
         response = my_notion.search(token_auth, timeout, gen_search_condition_title(query, property_name), database_id)
         code = response.status_code
         if code != 200:
             print(query+"code: "+str(code)+"=====>"+response.content.decode()+"\n")
-            search_processor(query, property_name, database_id, timeout + 1, retry_count + 1)
+            search_processor(query, property_name, database_id, timeout + 1, retry_count - 1)
         else:
             return response
     except Exception as e:
         print(str(query)+"=====>超时，第"+str(retry_count)+"次重试开始"+"\n")
-        search_processor(query, property_name, database_id, timeout+1, retry_count + 1)
+        search_processor(query, property_name, database_id, timeout+1, retry_count - 1)
+
+
+def get_id(query_context, query_prop, database_id, timeout, retry_count):
+    # 执行搜索
+    page_result = search_processor(query_context, query_prop, database_id, timeout, retry_count)
+    if page_result is not None:
+        if page_result.json()['results'] is not None:
+            if len(page_result.json()['results']) > 0:
+                return page_result.json()['results'][0]['id']
+    return None
 
 
 def update_thread(page_result):
@@ -117,15 +128,75 @@ def update_thread(page_result):
     print(update_result)
 
 
+def update_thread_dict_4_month_day(days_dict):
+    print(days_dict)
+
+
+def thread_search_day_id(day):
+    day_dict = {}
+    day_id = get_id(day, "标题", "53029b8eef9e47e0a3ee916f71018c9a", 10, 3)
+    if day_id is not None:
+        day_dict[day] = day_id
+    else:
+        day_dict[day] = ""
+    return day_dict
+
+
+# 账单结构转换为dict提高查询效率
+def convert_month_day_dict(bills):
+    # 月份与日期映射关系 格式{12月:{1日:[账单1,账单2],day_id:"日期ID"},month_id:"12月id"}
+    month_day_dict = {}
+    # 填装月日dict结构
+    for bill in bills:
+        month = bill["properties"]["月份"]["formula"]["string"]
+        day = bill["properties"]["日期"]["formula"]["string"]
+        if month in month_day_dict.keys():
+            # 天与账单映射 格式{1日:[账单1,账单2],day_id:"日期ID"}
+            day_map = month_day_dict[month]
+            # 账单对象列表
+            if day in day_map.keys():
+                bill_list = day_map[day]["data"]
+                bill_list.append(bill["id"])
+            else:
+                day_map[day] = {}
+                day_map[day]["data"] = [bill["id"]]
+        else:
+            month_day_dict[month] = {}
+            month_id = get_id(month, "月份", "bbc595d50e2b4db3b9a28fb404d2222d", 10, 5)
+            if month_id is None:
+                return "查询月份ID失败，请重新查询"
+            month_day_dict["month_id"] = month_id
+    for month in month_day_dict.keys():
+        if month == "month_id":
+            continue
+        # 单独多线程查询当月的日报id
+        days_dict = \
+            thread_util.thread_pool_submit_processor(month_day_dict[month], thread_search_day_id, THREAD_POOL_SUM_ROW)
+        days_result = thread_util.thread_pool_feature_result_processor(days_dict)
+        # print(type(days_result))
+        for day in days_result:
+            for day_key in day.keys():
+                # print(month_day_dict[month][day_key])
+                # print(day[day_key])
+                month_day_dict[month][day_key]["day_id"] = day[day_key]
+
+    return month_day_dict
+
+
 if __name__ == '__main__':
-    page = my_notion.search(token_auth, 10, gen_search_condition_time("2021-04-24", "2021-04-24", "交易时间"),
+    page = my_notion.search(token_auth, 15, gen_search_condition_time("2021-03-01", "2021-03-31", "交易时间"),
                             "526f7c6fccc54ff5b468557fce038dce")
     page_json = page.json()
     index = 1
     results = page_json['results']
     print("一共"+str(len(results))+"条数据")
-    # print(page_json)
-    thread_util.thread_pool_processor(results, update_thread, THREAD_POOL_SUM_ROW)
+    # 低效率按账单条数查询与插入
+    # thread_util.thread_pool_processor(results, update_thread, THREAD_POOL_SUM_ROW)
+
+    # 格式转换dict按月和日做聚合
+    month_day_map = convert_month_day_dict(results)
+    print(month_day_map)
+
 
 
 
