@@ -1,9 +1,10 @@
 # -*- coding: UTF-8 -*-
 import requests
 import query_notion
+from util import file_util
 
 version_date = '2021-05-13'
-token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
+token_auth = file_util.read_notion_token()
 
 
 # 查询database数据

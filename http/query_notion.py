@@ -1,11 +1,8 @@
 # -*- coding: UTF-8 -*-
 
-import future as future
-
 import my_notion
 import update_bill
-import traceback
-import thread_util
+from util import thread_util
 
 version_date = '2021-05-13'
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
@@ -205,7 +202,7 @@ def convert_bill_list_4_month_day(month_day_dict):
 
 
 if __name__ == '__main__':
-    page = my_notion.search(token_auth, 15, gen_search_condition_time("2021-04-26", "2021-04-26", "交易时间"),
+    page = my_notion.search(token_auth, 15, gen_search_condition_time("2022-08-01", "2022-08-15", "交易时间"),
                             "526f7c6fccc54ff5b468557fce038dce")
     page_json = page.json()
     index = 1
