@@ -5,6 +5,8 @@ import regex as regex
 import my_notion
 from cache import my_redis
 from util import thread_util
+from util import file_util
+from threading import Thread
 
 total_bill_database_id = "d250ca9f916c4c0e82b66d451f434701"
 # 账单明细表
@@ -526,9 +528,25 @@ def gen_unique_id(pay_type, data):
         return name + data["交易时间"] + data["金额"]
 
 
+# 读取账单文件名
+def read_bill_file():
+    root_dir = "/root/bill/"
+    map = {}
+    for file_name in file_util.read_files_path(root_dir):
+        if "alipay" in file_name:
+            map["alipay"] = root_dir+file_name
+        if "微信" in file_name:
+            map["wechat"] = root_dir+file_name
+    return map
+
+
 if __name__ == '__main__':
-    wechat('/mnt/c/Users/Administrator/Desktop/微信支付账单(20220701-20220731).csv')
-    alipay('/mnt/c/Users/Administrator/Desktop/alipay_record_20220806_164838.csv')
+    map = read_bill_file()
+    # 多线程执行
+    wec = Thread(target=wechat, args=(map.get("wechat"),))
+    ali = Thread(target=alipay, args=(map.get("alipay"),))
+    wec.start()
+    ali.start()
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
