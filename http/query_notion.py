@@ -202,7 +202,7 @@ def convert_bill_list_4_month_day(month_day_dict):
 
 
 if __name__ == '__main__':
-    page = my_notion.search(token_auth, 15, gen_search_condition_time("2022-08-01", "2022-08-15", "交易时间"),
+    page = my_notion.search(token_auth, 20, gen_search_condition_time("2022-10-01", "2022-10-17", "交易时间"),
                             "526f7c6fccc54ff5b468557fce038dce")
     page_json = page.json()
     index = 1

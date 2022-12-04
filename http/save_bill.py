@@ -532,21 +532,28 @@ def gen_unique_id(pay_type, data):
 def read_bill_file():
     root_dir = "/root/bill/"
     map = {}
+    ali_list = []
+    we_list = []
+    map["alipay"] = ali_list
+    map["wechat"] = we_list
     for file_name in file_util.read_files_path(root_dir):
         if "alipay" in file_name:
-            map["alipay"] = root_dir+file_name
+            map["alipay"].append(root_dir+file_name)
         if "微信" in file_name:
-            map["wechat"] = root_dir+file_name
+            map["wechat"].append(root_dir+file_name)
     return map
 
 
 if __name__ == '__main__':
     map = read_bill_file()
     # 多线程执行
-    wec = Thread(target=wechat, args=(map.get("wechat"),))
-    ali = Thread(target=alipay, args=(map.get("alipay"),))
-    wec.start()
-    ali.start()
+    for we_file in map.get("wechat"):
+        wec = Thread(target=wechat, args=(we_file,))
+        wec.start()
+    for ali_file in map.get("alipay"):
+        ali = Thread(target=alipay, args=(ali_file,))
+        ali.start()
+
     # mock_wechat(wechat_database_id)
     # mock_alipay(alipay_database_id)
     # print(create_total_bill(token_auth, total_bill_database_id, 5, "2021/07/01"))
