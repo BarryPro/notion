@@ -19,8 +19,6 @@ THREAD_POOL_SUM_ROW = 200
 TIME_OUT = 10
 # 最大重试次数
 MAX_RETRY_COUNT = 5
-# 账单归属人
-BILL_PERSON = ""
 
 WECHAT = "wechat"
 ALIPAY = "alipay"
@@ -33,7 +31,6 @@ def wechat(filepath):
         lines = f.readlines()
         striped_lines = []
         start = False
-        global BILL_PERSON
         BILL_PERSON = lines[1].replace("微信昵称：[", "").replace("],,,,,,,,", "")
         for line in lines:
             if not start:
@@ -43,7 +40,10 @@ def wechat(filepath):
             striped_lines.append(line.strip())
 
         csv_reader = csv.DictReader(striped_lines)
-        thread_util.thread_pool_processor(csv_reader, save_wechat_row_thread, THREAD_POOL_SUM_ROW)
+        csv_list = []
+        for csv_reader_item in csv_reader:
+            csv_list.append({"BILL_PERSON": BILL_PERSON, "CSV_READER_ITEM": csv_reader_item})
+        thread_util.thread_pool_processor(csv_list, save_wechat_row_thread, THREAD_POOL_SUM_ROW)
         print("微信账单-执行完成\n")
 
 
@@ -52,38 +52,41 @@ def alipay(filepath):
         lines = f.readlines()
         striped_lines = []
         start = False
+        BILL_PERSON = ''
         for line in lines:
             if not start:
                 if line.startswith("------------------------"):
                     start = True
                 continue
             if line.startswith("----------------------------"):
-                global BILL_PERSON
                 BILL_PERSON = lines[lines.index(line)+2].replace("姓名：", "")
                 break
             l = regex.sub(r"\s+,", ",", line)
             striped_lines.append(l)
 
         csv_reader = csv.DictReader(striped_lines)
-        thread_util.thread_pool_processor(csv_reader, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
+        csv_list = []
+        for csv_reader_item in csv_reader:
+            csv_list.append({"BILL_PERSON": BILL_PERSON, "CSV_READER_ITEM": csv_reader_item})
+        thread_util.thread_pool_processor(csv_list, save_alipay_row_thread, THREAD_POOL_SUM_ROW)
         print("支付宝账单-执行完成\n")
 
 
-def save_wechat_row_thread(row):
-    save_wechat_row(row, 10, 1)
+def save_wechat_row_thread(csv_list):
+    save_wechat_row(csv_list["CSV_READER_ITEM"], 10, 1, csv_list["BILL_PERSON"])
 
 
-def save_alipay_row_thread(row):
-    save_alipay_row(row, 10, 1)
+def save_alipay_row_thread(csv_list):
+    save_alipay_row(csv_list["CSV_READER_ITEM"], 10, 1, csv_list["BILL_PERSON"])
 
 
 # 支持超时重试保存微信账单
-def save_wechat_row(row, timeout, retry_count):
+def save_wechat_row(row, timeout, retry_count, bill_person):
     try:
         if retry_count > MAX_RETRY_COUNT:
             print("超过最大超时时间"+row["商品"]+"\n")
             return
-        response = save_wechat(my_notion.token_auth, alipay_database_id, row, timeout)
+        response = save_wechat(my_notion.token_auth, alipay_database_id, row, timeout, bill_person)
         if response == REPEAT:
             return
         code = response.status_code
@@ -95,16 +98,16 @@ def save_wechat_row(row, timeout, retry_count):
             my_redis.save_bill_unique_id(gen_unique_id(WECHAT, row))
     except Exception:
         print(str(row['商品'])+"=====>超时，第"+str(retry_count)+"次重试开始\n")
-        save_wechat_row(row, timeout+1, retry_count + 1)
+        save_wechat_row(row, timeout+1, retry_count + 1, bill_person)
 
 
 # 支持超时重试保存微信账单
-def save_alipay_row(row, timeout, retry_count):
+def save_alipay_row(row, timeout, retry_count, bill_person):
     try:
         if retry_count > MAX_RETRY_COUNT:
             print("超过最大超时时间"+row["商品说明"]+"\n")
             return
-        response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout)
+        response = save_alipay(my_notion.token_auth, alipay_database_id, row, timeout, bill_person)
         if response == REPEAT:
             return
         code = response.status_code
@@ -116,17 +119,17 @@ def save_alipay_row(row, timeout, retry_count):
             my_redis.save_bill_unique_id(gen_unique_id(ALIPAY, row))
     except Exception as e:
         print(str(row['商品说明'])+"=====>超时，第"+str(retry_count)+"次重试开始"+"\n")
-        save_alipay_row(row, timeout+1, retry_count + 1)
+        save_alipay_row(row, timeout+1, retry_count + 1, bill_person)
 
 
-def save_alipay(token, target_database_id, data, timeout):
+def save_alipay(token, target_database_id, data, timeout, bill_person):
     # 重写微信账单名称
     name = data["商品说明"]
     if data["商品说明"] == '/':
         name = data['交易分类']
 
     # 生成写入数据
-    body = gen_body_alipay(target_database_id, data, name)
+    body = gen_body_alipay(target_database_id, data, name, bill_person)
 
     # 查询缓存，如果缓存不存在写notion数据库
     if not my_redis.is_exist_bill_unique_id(gen_unique_id(ALIPAY, data)):
@@ -138,7 +141,7 @@ def save_alipay(token, target_database_id, data, timeout):
 
 
 # 保存微信账单
-def save_wechat(token, target_database_id, data, timeout):
+def save_wechat(token, target_database_id, data, timeout, bill_person):
     # 重写微信账单名称
     name = data["商品"]
     if data["商品"] == '/':
@@ -147,7 +150,7 @@ def save_wechat(token, target_database_id, data, timeout):
         name = data['交易对方'] + "-" + data['交易类型']
 
     # 生成写入数据
-    body = gen_body_wechat(target_database_id, data, name)
+    body = gen_body_wechat(target_database_id, data, name, bill_person)
     # 查询缓存,如果缓存不存在操作写notion数据库
     if not my_redis.is_exist_bill_unique_id(gen_unique_id(WECHAT, data)):
         # 创建数据page
@@ -176,7 +179,7 @@ def gen_search_text(data):
 
 
 # 生成数据响应体
-def gen_body_wechat(target_database_id, data, name):
+def gen_body_wechat(target_database_id, data, name, bill_person):
     pay_method = data["支付方式"] if data["支付方式"] != '/' else "默认"
     pay_method = pay_method.replace("浦发银行", "浦发银行储蓄卡").replace("北京银行", "北京银行储蓄卡")
     money = str(data["金额(元)"]).replace("¥", "")
@@ -208,7 +211,7 @@ def gen_body_wechat(target_database_id, data, name):
             "账单归属人": {
                 "type": "select",
                 "select": {
-                    "name": BILL_PERSON,
+                    "name": bill_person,
                 }
             },
             "交易状态": {
@@ -265,7 +268,7 @@ def gen_body_wechat(target_database_id, data, name):
     }
 
 
-def gen_body_alipay(target_database_id, data, name):
+def gen_body_alipay(target_database_id, data, name, bill_person):
     pay_method = data["收/付款方式"] if data["收/付款方式"] != '' else "默认"
     if pay_method.find('花呗') >= 0:
         pay_method = "花呗"
@@ -299,7 +302,7 @@ def gen_body_alipay(target_database_id, data, name):
             "账单归属人": {
                 "type": "select",
                 "select": {
-                    "name": BILL_PERSON,
+                    "name": bill_person,
                 }
             },
             "交易状态": {

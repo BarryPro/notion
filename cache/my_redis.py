@@ -8,7 +8,7 @@ import redis
 # port redis-server 开放的端口号
 # db 指定操作数据的db号 1表示notion账单唯一ID数据库
 # decode_responses 设置从redis取出来以字符串返回，默认是返回字节
-r = redis.StrictRedis(host='10.0.0.140', port=6379, db=1, decode_responses=True)
+r = redis.StrictRedis(host='10.0.0.140', port=6379, db=2, decode_responses=True)
 
 
 # 缓存中写账单唯一ID
