@@ -27,6 +27,18 @@ def is_exist_bill_unique_id(bill_unique_id):
     return bill_id == '1'
 
 
+def set_nx_bill_unique_id(bill_unique_id):
+    #  是否设置唯一键成功，true成功，false设置失败，表示之前列表已经存在
+    key_ = "bill_nx_"+bill_unique_id
+    #  10分钟有效期
+    r.expire(key_, 600)
+    return r.setnx("bill_nx_"+bill_unique_id, 1) == 1
+
+
+def save_dup_bill_key_list(date, bill_unique_id):
+    r.hset("dup_bill_dict", date, bill_unique_id)
+
+
 if __name__ == '__main__':
     key = "124235366"
     # print(save_bill_unique_id(key))

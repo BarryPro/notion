@@ -2,8 +2,9 @@
 
 import my_notion
 import update_bill
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 from util import thread_util
+from cache import my_redis
 
 version_date = '2021-05-13'
 token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
@@ -145,6 +146,10 @@ def convert_month_day_dict(bills):
     for bill in bills:
         month = bill["properties"]["月份"]["formula"]["string"]
         day = bill["properties"]["日期"]["formula"]["string"]
+        unique_id = bill["properties"]["唯一键"]["formula"]["string"]
+        # 检查是否设置唯一键成功，不成功表示有重复的账单记录
+        if not my_redis.set_nx_bill_unique_id(unique_id):
+            my_redis.save_dup_bill_key_list(str(month)+'_'+str(day), unique_id)
         if month in month_day_dict.keys():
             # 天与账单映射 格式{1日:[账单1,账单2],day_id:"日期ID"}
             day_map = month_day_dict[month]
@@ -253,9 +258,9 @@ def gen_date_str_map(date_list):
 
 
 if __name__ == '__main__':
-    start_date = "2022-12"
+    start_date = "2023-01"
     end_date = "2023-02"
-    date_list_ = gen_date_time_list(start_date, end_date, 5)
+    date_list_ = gen_date_time_list(start_date, end_date, 6)
     print(date_list_)
     # 多线程更新账单的月报和日报
     thread_util.thread_pool_processor(date_list_, bill_relation_month_and_day, THREAD_POOL_4_QUERY)
