@@ -2,6 +2,7 @@
 
 import my_notion
 import update_bill
+from datetime import datetime,timedelta
 from util import thread_util
 
 version_date = '2021-05-13'
@@ -10,6 +11,7 @@ token_auth = "secret_phe6WVdTudowSUsErvQn8WXi1VILdE7li7SZ6uvjVAi"
 alipay_database_id = "526f7c6fccc54ff5b468557fce038dce"
 # 线程池数量-账单行数
 THREAD_POOL_SUM_ROW = 200
+THREAD_POOL_4_QUERY = 10
 
 
 # 按时间范围查找
@@ -190,32 +192,76 @@ def update_bill_month_day(bill):
     print(update_result)
 
 
-def convert_bill_list_4_month_day(month_day_dict):
+def convert_bill_list_4_month_day(month_day_map):
     bill_result = []
-    for month_key in month_day_dict.keys():
+    for month_key in month_day_map.keys():
         if month_key != "month_id":
             for day_key in month_day_map[month_key].keys():
                 for bill in month_day_map[month_key][day_key]["data"]:
-                    bill_item = bill+"#"+month_day_map[month_key][day_key]["day_id"]+"#"+month_day_dict["month_id"]
+                    bill_item = bill+"#"+month_day_map[month_key][day_key]["day_id"]+"#"+month_day_map["month_id"]
                     bill_result.append(bill_item)
     return bill_result
 
 
-if __name__ == '__main__':
-    page = my_notion.search(token_auth, 20, gen_search_condition_time("2022-10-01", "2022-10-17", "交易时间"),
+# 账单关联月报和日报
+def bill_relation_month_and_day(date_time):
+    date_items = date_time.split("#")
+    _start_date_ = date_items[0]
+    _end_date_ = date_items[1]
+    page = my_notion.search(token_auth, 20, gen_search_condition_time(_start_date_, _end_date_, "交易时间"),
                             "526f7c6fccc54ff5b468557fce038dce")
     page_json = page.json()
-    index = 1
     results = page_json['results']
-    print("一共"+str(len(results))+"条数据")
-    # 低效率按账单条数查询与插入
-    # thread_util.thread_pool_processor(results, update_thread, THREAD_POOL_SUM_ROW)
+    print("一共" + str(len(results)) + "条数据")
 
     # 格式转换dict按月和日做聚合
     month_day_map = convert_month_day_dict(results)
     bills_list = convert_bill_list_4_month_day(month_day_map)
     print(bills_list)
     thread_util.thread_pool_processor(bills_list, update_bill_month_day, THREAD_POOL_SUM_ROW)
+
+
+# 生成时间范围
+def date_range(start: datetime, end: datetime):
+    for n in range((end-start).days):
+        yield start + timedelta(n)
+
+
+# 生成时间列表,根据时间间隔
+def gen_date_time_list(date_start, date_end, internal):
+    dt_start = datetime.strptime(date_start, '%Y-%m')
+    dt_end = datetime.strptime(date_end, '%Y-%m')
+    date_list = [dt_start]
+    for date in date_range(dt_start, dt_end):
+        if date.day % internal == 0:
+            date_list.append(date)
+    date_list.append(dt_end)
+
+    date_time_list = []
+    data_map = gen_date_str_map(date_list)
+    for key in data_map:
+        date_time_list.append(key+'#'+data_map[key])
+    return date_time_list
+
+
+def gen_date_str_map(date_list):
+    date_map = {}
+    for i, date in enumerate(date_list):
+        if i < len(date_list) - 1:
+            date_map[str(date)] = str(date_list[i+1])
+    return date_map
+
+
+if __name__ == '__main__':
+    start_date = "2022-12"
+    end_date = "2023-02"
+    date_list_ = gen_date_time_list(start_date, end_date, 5)
+    print(date_list_)
+    # 多线程更新账单的月报和日报
+    thread_util.thread_pool_processor(date_list_, bill_relation_month_and_day, THREAD_POOL_4_QUERY)
+
+    # bill_relation_month_and_day("2023-01", "2023-01")
+
 
 
 
