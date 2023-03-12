@@ -55,14 +55,15 @@ def alipay(filepath):
         BILL_PERSON = ''
         for line in lines:
             if not start:
-                if line.startswith("------------------------"):
+                if line.startswith("------------------------支付宝"):
                     start = True
-                continue
-            if line.startswith("----------------------------"):
+                    continue
+            if line.startswith("--------------------------------------------"):
                 BILL_PERSON = lines[lines.index(line)+2].replace("姓名：", "")
-                break
-            l = regex.sub(r"\s+,", ",", line)
-            striped_lines.append(l)
+                continue
+            if start:
+                # 有效的账单记录
+                striped_lines.append(regex.sub(r"\s+,", ",", line))
 
         csv_reader = csv.DictReader(striped_lines)
         csv_list = []
