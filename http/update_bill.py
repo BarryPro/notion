@@ -43,15 +43,7 @@ def gen_update_content(database_id, day_id, month_id):
                         "id": day_id
                     }
                 ]
-            },
-            "月报": {
-                "type": "relation",
-                "relation": [
-                    {
-                        "id": month_id
-                    }
-                ]
-            },
+            }
         }
     }
 

@@ -258,9 +258,9 @@ def gen_date_str_map(date_list):
 
 
 if __name__ == '__main__':
-    start_date = "2023-01"
-    end_date = "2023-02"
-    date_list_ = gen_date_time_list(start_date, end_date, 6)
+    start_date = "2023-03"
+    end_date = "2023-05"
+    date_list_ = gen_date_time_list(start_date, end_date, 10)
     print(date_list_)
     # 多线程更新账单的月报和日报
     thread_util.thread_pool_processor(date_list_, bill_relation_month_and_day, THREAD_POOL_4_QUERY)
